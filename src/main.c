@@ -1,35 +1,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <readline/readline.h>
 #include <readline/history.h>
 
 #include "token.h"
-#include "lexer.h"
+#include "parser.h"
+#include "expand.h"
 
 int main(void)
 {
-    char *line;
-
-    /* Milestone 1 welcome banner */
     printf("=====================================\n");
-    printf("           Shellforge\n");
-    printf(" A Unix Style Shell written in C\n");
+    printf("           SHELLFORGE\n");
+    printf("       Milestone 2.2 - Parser\n");
     printf("=====================================\n");
 
     while (1)
     {
-        line = readline("shellforge$ ");
+        char *line = readline("shellforge$ ");
 
-        /* Ctrl+D */
         if (line == NULL)
         {
-            printf("\nGoodbye!\n");
+            printf("\nExiting Shellforge...\n");
             break;
         }
 
-        /* Ignore empty input */
         if (strlen(line) == 0)
         {
             free(line);
@@ -38,7 +33,6 @@ int main(void)
 
         add_history(line);
 
-        /* Exit command */
         if (strcmp(line, "exit") == 0)
         {
             free(line);
@@ -46,23 +40,22 @@ int main(void)
             break;
         }
 
-        /* Tokenize input */
         Token tokens[MAX_TOKENS];
 
         int count = tokenize(line, tokens, MAX_TOKENS);
 
         if (count < 0)
         {
+            printf("Tokenization failed.\n");
             free(line);
             continue;
         }
 
-        /* Display tokens */
-        print_tokens(tokens, count);
+        expand_tokens(tokens, count);
 
-        /* Free token memory */
+        parse_tokens(tokens, count);
+
         free_tokens(tokens, count);
-
         free(line);
     }
 

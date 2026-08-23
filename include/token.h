@@ -6,6 +6,11 @@
 typedef enum
 {
     TOKEN_WORD,
+    TOKEN_PIPE,
+    TOKEN_INPUT,
+    TOKEN_OUTPUT,
+    TOKEN_APPEND,
+    TOKEN_BACKGROUND,
     TOKEN_END
 } TokenType;
 
