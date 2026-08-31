@@ -10,6 +10,7 @@
 #include "parser.h"
 #include "expand.h"
 #include "builtin.h"
+#include "executor.h"
 
 int main(void)
 {
@@ -63,7 +64,7 @@ int main(void)
         parse_tokens(tokens, count);
 
         /*
-         * Execute built-in commands.
+         * Execute built-in or external commands.
          */
         if (count > 0 && tokens[0].type != TOKEN_END)
         {
@@ -91,8 +92,7 @@ int main(void)
             }
             else
             {
-                printf("Command not found: %s\n",
-                       tokens[0].value);
+                execute_external(tokens, count);
             }
         }
 
