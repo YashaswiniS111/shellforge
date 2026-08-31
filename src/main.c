@@ -1,18 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include <readline/readline.h>
 #include <readline/history.h>
 
 #include "token.h"
+#include "lexer.h"
 #include "parser.h"
 #include "expand.h"
+#include "builtin.h"
 
 int main(void)
 {
     printf("=====================================\n");
-    printf("           SHELLFORGE\n");
-    printf("       Milestone 2.2 - Parser\n");
+    printf("           Shellforge\n");
+    printf("    A Unix Style Shell written in C\n");
     printf("=====================================\n");
 
     while (1)
@@ -33,13 +36,6 @@ int main(void)
 
         add_history(line);
 
-        if (strcmp(line, "exit") == 0)
-        {
-            free(line);
-            printf("Exiting Shellforge...\n");
-            break;
-        }
-
         Token tokens[MAX_TOKENS];
 
         int count = tokenize(line, tokens, MAX_TOKENS);
@@ -51,9 +47,54 @@ int main(void)
             continue;
         }
 
+        /*
+         * Expand variables such as $HOME.
+         */
         expand_tokens(tokens, count);
 
+        /*
+         * Display tokens.
+         */
+        print_tokens(tokens, count);
+
+        /*
+         * Display parsed pipeline information.
+         */
         parse_tokens(tokens, count);
+
+        /*
+         * Execute built-in commands.
+         */
+        if (count > 0 && tokens[0].type != TOKEN_END)
+        {
+            if (is_builtin(tokens[0].value))
+            {
+                if (strcmp(tokens[0].value, "pwd") == 0)
+                {
+                    builtin_pwd(tokens, count);
+                }
+                else if (strcmp(tokens[0].value, "cd") == 0)
+                {
+                    builtin_cd(tokens, count);
+                }
+                else if (strcmp(tokens[0].value, "echo") == 0)
+                {
+                    builtin_echo(tokens, count);
+                }
+                else if (strcmp(tokens[0].value, "exit") == 0)
+                {
+                    free_tokens(tokens, count);
+                    free(line);
+
+                    return 0;
+                }
+            }
+            else
+            {
+                printf("Command not found: %s\n",
+                       tokens[0].value);
+            }
+        }
 
         free_tokens(tokens, count);
         free(line);
