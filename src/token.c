@@ -23,14 +23,36 @@ int tokenize(const char *input, Token tokens[], int max_tokens)
             break;
         }
 
-        int start = i;
+        /*
+         * Pipeline operator.
+         */
+        if (input[i] == '|')
+        {
+            tokens[count].type = TOKEN_PIPE;
+            tokens[count].value = malloc(2);
+
+            if (tokens[count].value == NULL)
+            {
+                perror("malloc");
+                free_tokens(tokens, count);
+                return -1;
+            }
+
+            strcpy(tokens[count].value, "|");
+
+            count++;
+            i++;
+            continue;
+        }
 
         /*
-         * Read one word.
-         * For Milestone 2, spaces separate tokens.
+         * Read a normal word.
          */
+        int start = i;
+
         while (input[i] != '\0' &&
-               !isspace((unsigned char)input[i]))
+               !isspace((unsigned char)input[i]) &&
+               input[i] != '|')
         {
             i++;
         }
@@ -54,11 +76,12 @@ int tokenize(const char *input, Token tokens[], int max_tokens)
         count++;
     }
 
-    /* Add END token */
+    /*
+     * Add END token.
+     */
     if (count < max_tokens)
     {
         tokens[count].type = TOKEN_END;
-
         tokens[count].value = malloc(4);
 
         if (tokens[count].value == NULL)
@@ -69,7 +92,6 @@ int tokenize(const char *input, Token tokens[], int max_tokens)
         }
 
         strcpy(tokens[count].value, "END");
-
         count++;
     }
 
@@ -91,6 +113,21 @@ const char *token_type_name(TokenType type)
     {
         case TOKEN_WORD:
             return "WORD";
+
+        case TOKEN_PIPE:
+            return "PIPE";
+
+        case TOKEN_INPUT:
+            return "INPUT";
+
+        case TOKEN_OUTPUT:
+            return "OUTPUT";
+
+        case TOKEN_APPEND:
+            return "APPEND";
+
+        case TOKEN_BACKGROUND:
+            return "BACKGROUND";
 
         case TOKEN_END:
             return "END";

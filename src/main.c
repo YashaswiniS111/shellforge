@@ -59,16 +59,37 @@ int main(void)
         print_tokens(tokens, count);
 
         /*
-         * Display parsed pipeline information.
+         * Display parsed pipeline.
          */
         parse_tokens(tokens, count);
 
         /*
-         * Execute built-in or external commands.
+         * Check whether the command contains a pipeline.
+         */
+        int has_pipe = 0;
+
+        for (int i = 0; i < count; i++)
+        {
+            if (tokens[i].type == TOKEN_PIPE)
+            {
+                has_pipe = 1;
+                break;
+            }
+
+            if (tokens[i].type == TOKEN_END)
+            {
+                break;
+            }
+        }
+
+        /*
+         * Built-ins are executed by the shell itself.
+         * For this milestone, pipelines are handled by
+         * the external command executor.
          */
         if (count > 0 && tokens[0].type != TOKEN_END)
         {
-            if (is_builtin(tokens[0].value))
+            if (!has_pipe && is_builtin(tokens[0].value))
             {
                 if (strcmp(tokens[0].value, "pwd") == 0)
                 {
@@ -92,7 +113,7 @@ int main(void)
             }
             else
             {
-                execute_external(tokens, count);
+                execute_pipeline(tokens, count);
             }
         }
 

@@ -6,20 +6,40 @@ void parse_tokens(Token tokens[], int count)
 {
     printf("\n========== PIPELINE ==========\n\n");
 
-    printf("Command 1\n");
-    printf("------------------------------\n");
-
-    printf("Arguments\n");
-
+    int command_number = 1;
     int argument = 0;
+
+    printf("Command %d\n", command_number);
+    printf("------------------------------\n");
+    printf("Arguments\n");
 
     for (int i = 0; i < count; i++)
     {
         if (tokens[i].type == TOKEN_END)
+        {
             break;
+        }
+
+        if (tokens[i].type == TOKEN_PIPE)
+        {
+            printf("Input      : None\n");
+            printf("Output     : Pipe\n");
+            printf("Append     : No\n");
+            printf("Background : No\n");
+
+            printf("==============================\n\n");
+
+            command_number++;
+            argument = 0;
+
+            printf("Command %d\n", command_number);
+            printf("------------------------------\n");
+            printf("Arguments\n");
+
+            continue;
+        }
 
         printf("argv[%d] = %s\n", argument, tokens[i].value);
-
         argument++;
     }
 
