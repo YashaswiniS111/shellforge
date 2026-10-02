@@ -1,0 +1,15 @@
+#ifndef BUILTIN_H
+#define BUILTIN_H
+
+#include "token.h"
+
+/* Built-in command functions */
+int builtin_pwd(Token tokens[], int count);
+int builtin_cd(Token tokens[], int count);
+int builtin_echo(Token tokens[], int count);
+int builtin_exit(Token tokens[], int count);
+
+/* Check whether a command is a built-in */
+int is_builtin(const char *command);
+
+#endif
