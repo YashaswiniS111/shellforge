@@ -9,15 +9,21 @@
 int execute_pipeline(Token tokens[], int count)
 {
     int command_count = 1;
+    int background = 0;
 
     /*
-     * Count the number of commands.
+     * Count commands and check for background execution.
      */
     for (int i = 0; i < count; i++)
     {
         if (tokens[i].type == TOKEN_PIPE)
         {
             command_count++;
+        }
+
+        if (tokens[i].type == TOKEN_BACKGROUND)
+        {
+            background = 1;
         }
     }
 
@@ -28,7 +34,7 @@ int execute_pipeline(Token tokens[], int count)
     pid_t pids[MAX_TOKENS];
 
     /*
-     * Create all required pipes.
+     * Create required pipes.
      */
     for (int i = 0; i < command_count - 1; i++)
     {
@@ -43,7 +49,7 @@ int execute_pipeline(Token tokens[], int count)
     int token_index = 0;
 
     /*
-     * Create one child process for every command.
+     * Create one child for every command.
      */
     while (command_index < command_count)
     {
@@ -51,10 +57,11 @@ int execute_pipeline(Token tokens[], int count)
         int argc = 0;
 
         /*
-         * Collect arguments until PIPE or END.
+         * Collect arguments until PIPE, BACKGROUND, or END.
          */
         while (token_index < count &&
                tokens[token_index].type != TOKEN_PIPE &&
+               tokens[token_index].type != TOKEN_BACKGROUND &&
                tokens[token_index].type != TOKEN_END)
         {
             args[argc++] = tokens[token_index].value;
@@ -64,11 +71,11 @@ int execute_pipeline(Token tokens[], int count)
         args[argc] = NULL;
 
         /*
-         * Skip empty commands.
+         * Empty command check.
          */
         if (argc == 0)
         {
-            fprintf(stderr, "shellforge: empty command in pipeline\n");
+            fprintf(stderr, "shellforge: empty command\n");
 
             for (int i = 0; i < command_count - 1; i++)
             {
@@ -100,8 +107,7 @@ int execute_pipeline(Token tokens[], int count)
         if (pids[command_index] == 0)
         {
             /*
-             * If this is not the first command,
-             * connect stdin to the previous pipe.
+             * Connect stdin from previous pipe.
              */
             if (command_index > 0)
             {
@@ -114,8 +120,7 @@ int execute_pipeline(Token tokens[], int count)
             }
 
             /*
-             * If this is not the last command,
-             * connect stdout to the current pipe.
+             * Connect stdout to next pipe.
              */
             if (command_index < command_count - 1)
             {
@@ -128,7 +133,7 @@ int execute_pipeline(Token tokens[], int count)
             }
 
             /*
-             * Close all pipe file descriptors.
+             * Close all pipe descriptors in child.
              */
             for (int i = 0; i < command_count - 1; i++)
             {
@@ -137,22 +142,20 @@ int execute_pipeline(Token tokens[], int count)
             }
 
             /*
-             * Replace child with external program.
+             * Execute external command.
              */
             execvp(args[0], args);
 
-            /*
-             * Only reached if execvp fails.
-             */
             perror("execvp");
             exit(127);
         }
 
         /*
-         * Move past PIPE.
+         * Move past PIPE or BACKGROUND.
          */
         if (token_index < count &&
-            tokens[token_index].type == TOKEN_PIPE)
+            (tokens[token_index].type == TOKEN_PIPE ||
+             tokens[token_index].type == TOKEN_BACKGROUND))
         {
             token_index++;
         }
@@ -161,7 +164,7 @@ int execute_pipeline(Token tokens[], int count)
     }
 
     /*
-     * Parent closes all pipe descriptors.
+     * Parent closes all pipes.
      */
     for (int i = 0; i < command_count - 1; i++)
     {
@@ -170,7 +173,16 @@ int execute_pipeline(Token tokens[], int count)
     }
 
     /*
-     * Wait for every child.
+     * Background commands must not be waited for.
+     */
+    if (background)
+    {
+        printf("[background] process started: %d\n", pids[command_count - 1]);
+        return 0;
+    }
+
+    /*
+     * Foreground command: wait for every child.
      */
     int last_status = 0;
 
@@ -186,7 +198,7 @@ int execute_pipeline(Token tokens[], int count)
         }
 
         /*
-         * Return the exit status of the last command.
+         * Return status of the last command.
          */
         if (i == command_count - 1)
         {

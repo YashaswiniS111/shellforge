@@ -46,13 +46,36 @@ int tokenize(const char *input, Token tokens[], int max_tokens)
         }
 
         /*
+         * Background operator.
+         */
+        if (input[i] == '&')
+        {
+            tokens[count].type = TOKEN_BACKGROUND;
+            tokens[count].value = malloc(2);
+
+            if (tokens[count].value == NULL)
+            {
+                perror("malloc");
+                free_tokens(tokens, count);
+                return -1;
+            }
+
+            strcpy(tokens[count].value, "&");
+
+            count++;
+            i++;
+            continue;
+        }
+
+        /*
          * Read a normal word.
          */
         int start = i;
 
         while (input[i] != '\0' &&
                !isspace((unsigned char)input[i]) &&
-               input[i] != '|')
+               input[i] != '|' &&
+               input[i] != '&')
         {
             i++;
         }

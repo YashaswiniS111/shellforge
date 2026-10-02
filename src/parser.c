@@ -9,6 +9,8 @@ void parse_tokens(Token tokens[], int count)
     int command_number = 1;
     int argument = 0;
 
+    int background = 0;
+
     printf("Command %d\n", command_number);
     printf("------------------------------\n");
     printf("Arguments\n");
@@ -20,12 +22,19 @@ void parse_tokens(Token tokens[], int count)
             break;
         }
 
+        if (tokens[i].type == TOKEN_BACKGROUND)
+        {
+            background = 1;
+            continue;
+        }
+
         if (tokens[i].type == TOKEN_PIPE)
         {
             printf("Input      : None\n");
             printf("Output     : Pipe\n");
             printf("Append     : No\n");
-            printf("Background : No\n");
+            printf("Background : %s\n",
+                   background ? "Yes" : "No");
 
             printf("==============================\n\n");
 
@@ -46,7 +55,8 @@ void parse_tokens(Token tokens[], int count)
     printf("Input      : None\n");
     printf("Output     : None\n");
     printf("Append     : No\n");
-    printf("Background : No\n");
+    printf("Background : %s\n",
+           background ? "Yes" : "No");
 
     printf("==============================\n");
 }
