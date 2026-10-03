@@ -11,9 +11,15 @@
 #include "expand.h"
 #include "builtin.h"
 #include "executor.h"
+#include "jobs.h"
 
 int main(void)
 {
+    /*
+     * Initialize the job table.
+     */
+    jobs_init();
+
     printf("=====================================\n");
     printf("           Shellforge\n");
     printf("    A Unix Style Shell written in C\n");
@@ -84,32 +90,12 @@ int main(void)
 
         /*
          * Built-ins are executed by the shell itself.
-         * For this milestone, pipelines are handled by
-         * the external command executor.
          */
         if (count > 0 && tokens[0].type != TOKEN_END)
         {
             if (!has_pipe && is_builtin(tokens[0].value))
             {
-                if (strcmp(tokens[0].value, "pwd") == 0)
-                {
-                    builtin_pwd(tokens, count);
-                }
-                else if (strcmp(tokens[0].value, "cd") == 0)
-                {
-                    builtin_cd(tokens, count);
-                }
-                else if (strcmp(tokens[0].value, "echo") == 0)
-                {
-                    builtin_echo(tokens, count);
-                }
-                else if (strcmp(tokens[0].value, "exit") == 0)
-                {
-                    free_tokens(tokens, count);
-                    free(line);
-
-                    return 0;
-                }
+                execute_builtin(tokens, count);
             }
             else
             {

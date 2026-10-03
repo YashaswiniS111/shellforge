@@ -1,10 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 #include "executor.h"
+#include "jobs.h"
 
 int execute_pipeline(Token tokens[], int count)
 {
@@ -12,29 +15,22 @@ int execute_pipeline(Token tokens[], int count)
     int background = 0;
 
     /*
-     * Count commands and check for background execution.
+     * Count commands and detect background execution.
      */
     for (int i = 0; i < count; i++)
     {
         if (tokens[i].type == TOKEN_PIPE)
-        {
             command_count++;
-        }
 
         if (tokens[i].type == TOKEN_BACKGROUND)
-        {
             background = 1;
-        }
     }
 
-    /*
-     * A pipeline with N commands needs N-1 pipes.
-     */
     int pipes[MAX_TOKENS][2];
     pid_t pids[MAX_TOKENS];
 
     /*
-     * Create required pipes.
+     * Create pipes.
      */
     for (int i = 0; i < command_count - 1; i++)
     {
@@ -49,16 +45,56 @@ int execute_pipeline(Token tokens[], int count)
     int token_index = 0;
 
     /*
-     * Create one child for every command.
+     * Build a command string for the job table.
+     */
+    char command_string[256];
+    command_string[0] = '\0';
+
+    for (int i = 0; i < count; i++)
+    {
+        if (tokens[i].type == TOKEN_END ||
+            tokens[i].type == TOKEN_BACKGROUND)
+        {
+            break;
+        }
+
+        if (tokens[i].type == TOKEN_PIPE)
+        {
+            strncat(command_string, "| ",
+                    sizeof(command_string) -
+                    strlen(command_string) - 1);
+        }
+        else
+        {
+            strncat(command_string, tokens[i].value,
+                    sizeof(command_string) -
+                    strlen(command_string) - 1);
+
+            strncat(command_string, " ",
+                    sizeof(command_string) -
+                    strlen(command_string) - 1);
+        }
+    }
+
+    /*
+     * Remove trailing space.
+     */
+    size_t command_length = strlen(command_string);
+
+    if (command_length > 0 &&
+        command_string[command_length - 1] == ' ')
+    {
+        command_string[command_length - 1] = '\0';
+    }
+
+    /*
+     * Create one child per command.
      */
     while (command_index < command_count)
     {
         char *args[MAX_TOKENS];
         int argc = 0;
 
-        /*
-         * Collect arguments until PIPE, BACKGROUND, or END.
-         */
         while (token_index < count &&
                tokens[token_index].type != TOKEN_PIPE &&
                tokens[token_index].type != TOKEN_BACKGROUND &&
@@ -70,14 +106,14 @@ int execute_pipeline(Token tokens[], int count)
 
         args[argc] = NULL;
 
-        /*
-         * Empty command check.
-         */
         if (argc == 0)
         {
-            fprintf(stderr, "shellforge: empty command\n");
+            fprintf(stderr,
+                    "shellforge: empty command\n");
 
-            for (int i = 0; i < command_count - 1; i++)
+            for (int i = 0;
+                 i < command_count - 1;
+                 i++)
             {
                 close(pipes[i][0]);
                 close(pipes[i][1]);
@@ -92,7 +128,9 @@ int execute_pipeline(Token tokens[], int count)
         {
             perror("fork");
 
-            for (int i = 0; i < command_count - 1; i++)
+            for (int i = 0;
+                 i < command_count - 1;
+                 i++)
             {
                 close(pipes[i][0]);
                 close(pipes[i][1]);
@@ -107,7 +145,20 @@ int execute_pipeline(Token tokens[], int count)
         if (pids[command_index] == 0)
         {
             /*
-             * Connect stdin from previous pipe.
+             * Put all commands in the pipeline
+             * into the same process group.
+             */
+            if (command_index == 0)
+            {
+                setpgid(0, 0);
+            }
+            else
+            {
+                setpgid(0, pids[0]);
+            }
+
+            /*
+             * Connect stdin.
              */
             if (command_index > 0)
             {
@@ -120,7 +171,7 @@ int execute_pipeline(Token tokens[], int count)
             }
 
             /*
-             * Connect stdout to next pipe.
+             * Connect stdout.
              */
             if (command_index < command_count - 1)
             {
@@ -133,21 +184,34 @@ int execute_pipeline(Token tokens[], int count)
             }
 
             /*
-             * Close all pipe descriptors in child.
+             * Close pipe descriptors.
              */
-            for (int i = 0; i < command_count - 1; i++)
+            for (int i = 0;
+                 i < command_count - 1;
+                 i++)
             {
                 close(pipes[i][0]);
                 close(pipes[i][1]);
             }
 
-            /*
-             * Execute external command.
-             */
             execvp(args[0], args);
 
             perror("execvp");
             exit(127);
+        }
+
+        /*
+         * Parent places child in the same process group.
+         */
+        if (command_index == 0)
+        {
+            setpgid(pids[command_index],
+                    pids[command_index]);
+        }
+        else
+        {
+            setpgid(pids[command_index],
+                    pids[0]);
         }
 
         /*
@@ -164,52 +228,88 @@ int execute_pipeline(Token tokens[], int count)
     }
 
     /*
-     * Parent closes all pipes.
+     * Parent closes pipes.
      */
-    for (int i = 0; i < command_count - 1; i++)
+    for (int i = 0;
+         i < command_count - 1;
+         i++)
     {
         close(pipes[i][0]);
         close(pipes[i][1]);
     }
 
+    pid_t pgid = pids[0];
+
     /*
-     * Background commands must not be waited for.
+     * Background process.
      */
     if (background)
     {
-        printf("[background] process started: %d\n", pids[command_count - 1]);
+        int job_id = job_add(pgid,
+                             command_string,
+                             JOB_RUNNING);
+
+        if (job_id < 0)
+        {
+            /*
+             * If the job table is full,
+             * wait for the processes.
+             */
+            for (int i = 0;
+                 i < command_count;
+                 i++)
+            {
+                waitpid(pids[i], NULL, 0);
+            }
+
+            return 1;
+        }
+
+        printf("[%d] %d %s\n",
+               job_id,
+               pgid,
+               command_string);
+
         return 0;
     }
 
     /*
-     * Foreground command: wait for every child.
+     * Foreground process.
      */
     int last_status = 0;
 
-    for (int i = 0; i < command_count; i++)
+    for (int i = 0;
+         i < command_count;
+         i++)
     {
         int status;
 
-        if (waitpid(pids[i], &status, 0) < 0)
+        if (waitpid(pids[i],
+                    &status,
+                    WUNTRACED) < 0)
         {
             perror("waitpid");
             last_status = 1;
             continue;
         }
 
-        /*
-         * Return status of the last command.
-         */
-        if (i == command_count - 1)
+        if (WIFSTOPPED(status))
+        {
+            job_add(pgid,
+                    command_string,
+                    JOB_STOPPED);
+
+            printf("\n[stopped] %s\n",
+                   command_string);
+
+            last_status = 1;
+        }
+        else if (i == command_count - 1)
         {
             if (WIFEXITED(status))
-            {
                 last_status = WEXITSTATUS(status);
-            }
             else
-            {
                 last_status = 1;
-            }
         }
     }
 

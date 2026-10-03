@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -std=c11 -Iinclude
+CFLAGS=-Wall -Wextra -std=gnu11 -Iinclude
 
 SRC=$(wildcard src/*.c)
 SHELL_SRC=$(filter-out src/memory_layout.c,$(SRC))
